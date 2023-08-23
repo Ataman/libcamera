@@ -143,6 +143,14 @@ struct _GstLibcameraSrc {
 
 	gchar *camera_name;
 	controls::AfModeEnum auto_focus_mode = controls::AfModeManual;
+	gint exposure_time = 0;
+	gfloat analog_gain = 0.0;
+	gfloat brightness = 0.0;
+	gfloat contrast = 1.0;
+	gfloat sharpness = 0.0;
+	gfloat saturation = 1.0;
+	gboolean awb_enable = true;
+	gint awb_mode = 0;
 
 	GstLibcameraSrcState *state;
 	GstLibcameraAllocator *allocator;
@@ -153,7 +161,15 @@ enum {
 	PROP_0,
 	PROP_CAMERA_NAME,
 	PROP_AUTO_FOCUS_MODE,
-};
+	PROP_EXPOSURE_TIME,
+	PROP_ANALOG_GAIN, // ISO = value * 100, (0 = AUTO)
+	PROP_BRIGHTNESS,
+	PROP_CONTRAST,
+	PROP_SHARPNESS,
+	PROP_SATURATION,
+	PROP_AWB_ENABLE,
+	PROP_AWB_MODE
+	};
 
 G_DEFINE_TYPE_WITH_CODE(GstLibcameraSrc, gst_libcamera_src, GST_TYPE_ELEMENT,
 			GST_DEBUG_CATEGORY_INIT(source_debug, "libcamerasrc", 0,
@@ -587,6 +603,95 @@ gst_libcamera_src_task_enter(GstTask *task, [[maybe_unused]] GThread *thread,
 		}
 	}
 
+	if (self->exposure_time != 0) {
+		const ControlInfoMap &infoMap = state->cam_->controls();
+		if (infoMap.find(&controls::ExposureTime) != infoMap.end()) {
+			state->initControls_.set(controls::ExposureTime, self->exposure_time);
+		} else {
+			GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+					("Failed to set exposure time"),
+					("Exposure time not supported by this camera, "));
+		}
+	}
+
+	if (self->analog_gain != 0.0) {
+		const ControlInfoMap &infoMap = state->cam_->controls();
+		if (infoMap.find(&controls::AnalogueGain) != infoMap.end()) {
+			state->initControls_.set(controls::AnalogueGain, self->analog_gain);
+		} else {
+			GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+					("Failed to set analogue gain"),
+					("analogue gain not supported by this camera, "));
+		}
+	}
+
+	if (self->brightness != 0.0) {
+		const ControlInfoMap &infoMap = state->cam_->controls();
+		if (infoMap.find(&controls::Brightness) != infoMap.end()) {
+			state->initControls_.set(controls::Brightness, self->brightness);
+		} else {
+			GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+					("Failed to set brightness"),
+					("brightness not supported by this camera, "));
+		}
+	}
+
+	if (self->contrast != 1.0) {
+		const ControlInfoMap &infoMap = state->cam_->controls();
+		if (infoMap.find(&controls::Contrast) != infoMap.end()) {
+			state->initControls_.set(controls::Contrast, self->contrast);
+		} else {
+			GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+					("Failed to set contrast"),
+					("Contrast not supported by this camera, "));
+		}
+	}
+
+	if (self->sharpness != 0.0) {
+		const ControlInfoMap &infoMap = state->cam_->controls();
+		if (infoMap.find(&controls::Sharpness) != infoMap.end()) {
+			state->initControls_.set(controls::Sharpness, self->sharpness);
+		} else {
+			GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+					("Failed to set sharpness"),
+					("Sharpness not supported by this camera, "));
+		}
+	}
+
+	if (self->saturation != 1.0) {
+		const ControlInfoMap &infoMap = state->cam_->controls();
+		if (infoMap.find(&controls::Saturation) != infoMap.end()) {
+			state->initControls_.set(controls::Saturation, self->saturation);
+		} else {
+			GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+					("Failed to set saturation"),
+					("Saturation not supported by this camera, "));
+		}
+	}
+
+	if (self->awb_enable != 0) {
+		const ControlInfoMap &infoMap = state->cam_->controls();
+		if (infoMap.find(&controls::AwbEnable) != infoMap.end()) {
+			state->initControls_.set(controls::AwbEnable, self->awb_enable);
+		} else {
+			GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+					("Failed to set awb enable"),
+					("Awb enable not supported by this camera, "));
+		}
+	}
+
+	if (self->awb_mode != 0) {
+		const ControlInfoMap &infoMap = state->cam_->controls();
+		if (infoMap.find(&controls::AwbMode) != infoMap.end()) {
+			state->initControls_.set(controls::AwbMode, self->awb_mode);
+		} else {
+			GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+					("Failed to set awb mode"),
+					("Awb mode not supported by this camera, "));
+		}
+	}
+
+
 	ret = state->cam_->start(&state->initControls_);
 	if (ret) {
 		GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
@@ -672,6 +777,30 @@ gst_libcamera_src_set_property(GObject *object, guint prop_id,
 	case PROP_AUTO_FOCUS_MODE:
 		self->auto_focus_mode = static_cast<controls::AfModeEnum>(g_value_get_enum(value));
 		break;
+	case PROP_EXPOSURE_TIME:
+		self->exposure_time = g_value_get_int(value);
+		break;
+	case PROP_ANALOG_GAIN:
+		self->analog_gain = g_value_get_float(value);
+		break;
+	case PROP_BRIGHTNESS:
+		self->brightness = g_value_get_float(value);
+		break;
+	case PROP_CONTRAST:
+		self->contrast = g_value_get_float(value);
+		break;
+	case PROP_SHARPNESS:
+		self->sharpness = g_value_get_float(value);
+		break;
+	case PROP_SATURATION:
+		self->saturation = g_value_get_float(value);
+		break;
+	case PROP_AWB_ENABLE:
+		self->awb_enable = g_value_get_boolean(value);
+		break;
+	case PROP_AWB_MODE:
+		self->awb_mode = g_value_get_int(value);
+		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
 		break;
@@ -691,6 +820,30 @@ gst_libcamera_src_get_property(GObject *object, guint prop_id, GValue *value,
 		break;
 	case PROP_AUTO_FOCUS_MODE:
 		g_value_set_enum(value, static_cast<gint>(self->auto_focus_mode));
+		break;
+	case PROP_EXPOSURE_TIME:
+		g_value_set_int(value, self->exposure_time);
+		break;
+	case PROP_ANALOG_GAIN:
+		g_value_set_float(value, self->analog_gain);
+		break;
+	case PROP_BRIGHTNESS:
+		g_value_set_float(value, self->brightness);
+		break;
+	case PROP_CONTRAST:
+		g_value_set_float(value, self->contrast);
+		break;
+	case PROP_SHARPNESS:
+		g_value_set_float(value, self->sharpness);
+		break;
+	case PROP_SATURATION:
+		g_value_set_float(value, self->saturation);
+		break;
+	case PROP_AWB_ENABLE:
+		g_value_set_boolean(value, self->awb_enable);
+		break;
+	case PROP_AWB_MODE:
+		g_value_set_int(value, self->awb_mode);
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -870,6 +1023,47 @@ gst_libcamera_src_class_init(GstLibcameraSrcClass *klass)
 				 "AfModeAuto or AfModeContinuous.",
 				 gst_libcamera_auto_focus_get_type(),
 				 static_cast<gint>(controls::AfModeManual),
-				 G_PARAM_WRITABLE);
+				 (GParamFlags)(G_PARAM_WRITABLE));
 	g_object_class_install_property(object_class, PROP_AUTO_FOCUS_MODE, spec);
+
+	g_object_class_install_property (object_class, PROP_EXPOSURE_TIME,
+      g_param_spec_int ("exposure-time", "Exposure time",
+          "Set a fixed exposure time, in microseconds. (0 = Auto)", 0,
+          6000000, 0, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+	g_object_class_install_property (object_class, PROP_ANALOG_GAIN,
+      g_param_spec_float ("analog-gain", "Analog Gain", "Analog gain value to use (ISO = value * 100) (0 = Auto)",
+	      0.0, 32.0, 0.0,
+          (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+	g_object_class_install_property (object_class, PROP_BRIGHTNESS,
+      g_param_spec_float ("brightness", "Brightness", "Image capture brightness",
+          -1.0, 1.0, 0,
+          (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+	g_object_class_install_property (object_class, PROP_CONTRAST,
+      g_param_spec_float ("contrast", "Contrast", "Image capture contrast",
+	      0.0, 10.0, 1.0, 
+		  (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+	g_object_class_install_property (object_class, PROP_SHARPNESS,
+      g_param_spec_float ("sharpness", "Sharpness", "Image capture sharpness",
+          -1.0, 1.0, 0,
+          (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+	g_object_class_install_property (object_class, PROP_SATURATION,
+      g_param_spec_float ("saturation", "Saturation", "Image capture saturation",
+          0.0, 10.0, 1.0,
+          (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+	g_object_class_install_property (object_class, PROP_AWB_ENABLE,
+      g_param_spec_boolean ("awb-enable", "Auto White Balance Enable", "Enable/Disable Auto White Balance", 
+		  true,
+          (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+	g_object_class_install_property (object_class, PROP_AWB_MODE,
+      g_param_spec_int ("awb-mode", "Auto White Balance Mode", "Auto White Balance mode, valid values depend on device.", 
+	  	  0, 7, 0,
+          (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
 }
