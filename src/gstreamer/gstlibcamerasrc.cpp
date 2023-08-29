@@ -151,6 +151,7 @@ struct _GstLibcameraSrc {
 	gfloat saturation = 1.0;
 	gboolean awb_enable = true;
 	gint awb_mode = 0;
+	gfloat lens_position = 0.0;
 
 	GstLibcameraSrcState *state;
 	GstLibcameraAllocator *allocator;
@@ -168,7 +169,8 @@ enum {
 	PROP_SHARPNESS,
 	PROP_SATURATION,
 	PROP_AWB_ENABLE,
-	PROP_AWB_MODE
+	PROP_AWB_MODE,
+	PROP_LENS_POSITION
 	};
 
 G_DEFINE_TYPE_WITH_CODE(GstLibcameraSrc, gst_libcamera_src, GST_TYPE_ELEMENT,
@@ -691,6 +693,17 @@ gst_libcamera_src_task_enter(GstTask *task, [[maybe_unused]] GThread *thread,
 		}
 	}
 
+	if (self->lens_position != 0.0) {
+		const ControlInfoMap &infoMap = state->cam_->controls();
+		if (infoMap.find(&controls::LensPosition) != infoMap.end()) {
+			state->initControls_.set(controls::LensPosition, self->lens_position);
+		} else {
+			GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+					("Failed to set lens position"),
+					("Lens position not supported by this camera, "));
+		}
+	}
+
 
 	ret = state->cam_->start(&state->initControls_);
 	if (ret) {
@@ -801,6 +814,9 @@ gst_libcamera_src_set_property(GObject *object, guint prop_id,
 	case PROP_AWB_MODE:
 		self->awb_mode = g_value_get_int(value);
 		break;
+	case PROP_LENS_POSITION:
+		self->lens_position = g_value_get_float(value);
+		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
 		break;
@@ -844,6 +860,9 @@ gst_libcamera_src_get_property(GObject *object, guint prop_id, GValue *value,
 		break;
 	case PROP_AWB_MODE:
 		g_value_set_int(value, self->awb_mode);
+		break;
+	case PROP_LENS_POSITION:
+		g_value_set_float(value, self->lens_position);
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -1026,6 +1045,11 @@ gst_libcamera_src_class_init(GstLibcameraSrcClass *klass)
 				 (GParamFlags)(G_PARAM_WRITABLE));
 	g_object_class_install_property(object_class, PROP_AUTO_FOCUS_MODE, spec);
 
+	g_object_class_install_property (object_class, PROP_LENS_POSITION,
+      g_param_spec_float ("lens-position", "Lens Position", "Lens position in manual focus mode.",
+          0.0, 100.0, 0.0,
+          (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
 	g_object_class_install_property (object_class, PROP_EXPOSURE_TIME,
       g_param_spec_int ("exposure-time", "Exposure time",
           "Set a fixed exposure time, in microseconds. (0 = Auto)", 0,
@@ -1065,5 +1089,6 @@ gst_libcamera_src_class_init(GstLibcameraSrcClass *klass)
       g_param_spec_int ("awb-mode", "Auto White Balance Mode", "Auto White Balance mode, valid values depend on device.", 
 	  	  0, 7, 0,
           (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+		  
 
 }
